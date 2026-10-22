@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Descubre Los Lagos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- Navegación -->
+    <nav class="bg-emerald-600 text-white p-4 shadow-md flex justify-between items-center">
+        <h1 class="text-2xl font-bold">📍 Descubre Los Lagos</h1>
+        <button id="btnLogin" class="bg-emerald-800 px-4 py-2 rounded hover:bg-emerald-700">Acceso Admin</button>
+        <button id="btnLogout" class="hidden bg-red-600 px-4 py-2 rounded hover:bg-red-500">Cerrar Sesión</button>
+    </nav>
+
+    <!-- Estado de Ubicación -->
+    <div id="locationStatus" class="bg-blue-100 text-blue-800 p-2 text-center text-sm font-semibold">
+        Calculando tu ubicación...
+    </div>
+
+    <!-- Panel de Administrador (Oculto por defecto) -->
+    <div id="adminPanel" class="hidden max-w-4xl mx-auto mt-6 bg-white p-6 rounded-lg shadow-md border-2 border-emerald-500">
+        <h2 class="text-xl font-bold mb-4 text-emerald-600">Panel de Administrador: Agregar Punto Turístico</h2>
+        <form id="addPlaceForm" class="space-y-4">
+            <input type="text" id="placeName" placeholder="Nombre del lugar (Ej: Salto del Collilelfu)" class="w-full p-2 border rounded" required>
+            <textarea id="placeDesc" placeholder="Descripción del lugar" class="w-full p-2 border rounded" required></textarea>
+            <input type="url" id="placeImage" placeholder="URL de la imagen" class="w-full p-2 border rounded" required>
+            <div class="flex gap-4">
+                <input type="number" id="placeLat" step="any" placeholder="Latitud (Ej: -39.85)" class="w-1/2 p-2 border rounded" required>
+                <input type="number" id="placeLng" step="any" placeholder="Longitud (Ej: -72.80)" class="w-1/2 p-2 border rounded" required>
+            </div>
+            <button type="submit" class="bg-emerald-600 text-white px-4 py-2 rounded w-full font-bold">Publicar Lugar</button>
+        </form>
+    </div>
+
+    <!-- Contenedor de Lugares -->
+    <main id="placesContainer" class="max-w-4xl mx-auto mt-8 grid gap-8 p-4"></main>
+
+    <!-- Scripts de Firebase (Módulos) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-firestore.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-auth.js";
+
+        // 🔥 REEMPLAZA ESTO CON TU CONFIGURACIÓN DE FIREBASE
+        const firebaseConfig = {
+            apiKey: "AIzaSyBqZOhs1PmGO0hfO-9g0q3k5exw8KkxpzM",
+            authDomain: "turismo-los-lagos.firebaseapp.com",
+            projectId: "turismo-los-lagos",
+            storageBucket: "turismo-los-lagos.firebasestorage.app",
+            messagingSenderId: "355598310347",
+            appId: "1:355598310347:web:11bcb226c8d50c619e344e"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let userLocation = null;
+        let isAdmin = false;
+
+        // 1. Geolocalización
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    userLocation = { lat: position.coords.latitude, lng: position.coords.longitude };
+                    document.getElementById('locationStatus').innerText = "📍 Ubicación detectada. Distancias calculadas correctamente.";
+                    document.getElementById('locationStatus').className = "bg-green-100 text-green-800 p-2 text-center text-sm font-semibold";
+                    loadPlaces(); // Recargar para mostrar distancias
+                },
+                () => {
+                    document.getElementById('locationStatus').innerText = "⚠️ No se pudo obtener tu ubicación. Las distancias no se mostrarán.";
+                    document.getElementById('locationStatus').className = "bg-yellow-100 text-yellow-800 p-2 text-center text-sm font-semibold";
+                }
+            );
+        }
+
+        // Fórmula Haversine para calcular distancia en km
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            if (!lat1 || !lon1) return null;
+            const R = 6371; 
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return (R * c).toFixed(1);
+        }
+
+        // 2. Autenticación de Administrador
+        const btnLogin = document.getElementById('btnLogin');
+        const btnLogout = document.getElementById('btnLogout');
+        const adminPanel = document.getElementById('adminPanel');
+
+        btnLogin.addEventListener('click', () => {
+            const email = prompt("Correo de administrador:");
+            const password = prompt("Contraseña:");
+            if (email && password) signInWithEmailAndPassword(auth, email, password).catch(e => alert("Error: " + e.message));
+        });
+
+        btnLogout.addEventListener('click', () => signOut(auth));
+
+        onAuthStateChanged(auth, (user) => {
+            isAdmin = !!user;
+            btnLogin.style.display = user ? 'none' : 'block';
+            btnLogout.style.display = user ? 'block' : 'none';
+            adminPanel.style.display = user ? 'block' : 'none';
+        });
+
+        // 3. Agregar Lugar (Admin)
+        document.getElementById('addPlaceForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if(!isAdmin) return alert("Debes ser administrador");
+            try {
+                await addDoc(collection(db, "lugares"), {
+                    nombre: document.getElementById('placeName').value,
+                    descripcion: document.getElementById('placeDesc').value,
+                    imagen: document.getElementById('placeImage').value,
+                    lat: parseFloat(document.getElementById('placeLat').value),
+                    lng: parseFloat(document.getElementById('placeLng').value),
+                    fecha: new Date()
+                });
+                e.target.reset();
+                alert("Lugar agregado exitosamente");
+            } catch (error) {
+                alert("Error al guardar: " + error.message);
+            }
+        });
+
+        // 4. Cargar y Mostrar Lugares
+        function loadPlaces() {
+            const q = query(collection(db, "lugares"), orderBy("fecha", "desc"));
+            onSnapshot(q, (snapshot) => {
+                const container = document.getElementById('placesContainer');
+                container.innerHTML = '';
+                
+                snapshot.forEach((docSnap) => {
+                    const place = docSnap.data();
+                    const placeId = docSnap.id;
+                    
+                    let distanciaTexto = "";
+                    if (userLocation) {
+                        const dist = calculateDistance(userLocation.lat, userLocation.lng, place.lat, place.lng);
+                        distanciaTexto = `<span class="bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-sm font-bold">A ${dist} km de ti</span>`;
+                    }
+
+                    const article = document.createElement('article');
+                    article.className = "bg-white rounded-lg shadow-md overflow-hidden flex flex-col md:flex-row";
+                    article.innerHTML = `
+                        <img src="${place.imagen}" alt="${place.nombre}" class="w-full md:w-1/3 object-cover h-48 md:h-auto">
+                        <div class="p-6 flex-1">
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="text-2xl font-bold">${place.nombre}</h3>
+                                ${distanciaTexto}
+                            </div>
+                            <p class="text-gray-600 mb-4">${place.descripcion}</p>
+                            
+                            <!-- Sección de Comentarios -->
+                            <div class="mt-4 pt-4 border-t border-gray-200">
+                                <h4 class="font-bold mb-2">Comentarios</h4>
+                                <div id="comments-${placeId}" class="space-y-2 mb-4 max-h-32 overflow-y-auto text-sm"></div>
+                                
+                                <form onsubmit="addComment(event, '${placeId}')" class="flex flex-col gap-2">
+                                    <input type="text" id="name-${placeId}" placeholder="Tu nombre" class="p-1 border rounded text-sm" required>
+                                    <input type="email" id="email-${placeId}" placeholder="Tu correo" class="p-1 border rounded text-sm" required>
+                                    <input type="text" id="msg-${placeId}" placeholder="Tu comentario" class="p-1 border rounded text-sm" required>
+                                    <button type="submit" class="bg-gray-800 text-white p-1 rounded hover:bg-gray-700 text-sm">Comentar</button>
+                                </form>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(article);
+                    loadComments(placeId);
+                });
+            });
+        }
+
+        // 5. Cargar y Agregar Comentarios
+        window.addComment = async function(e, placeId) {
+            e.preventDefault();
+            try {
+                await addDoc(collection(db, `lugares/${placeId}/comentarios`), {
+                    nombre: document.getElementById(`name-${placeId}`).value,
+                    correo: document.getElementById(`email-${placeId}`).value,
+                    mensaje: document.getElementById(`msg-${placeId}`).value,
+                    fecha: new Date()
+                });
+                e.target.reset();
+            } catch (error) {
+                alert("Error al comentar: " + error.message);
+            }
+        };
+
+        function loadComments(placeId) {
+            const q = query(collection(db, `lugares/${placeId}/comentarios`), orderBy("fecha", "asc"));
+            onSnapshot(q, (snapshot) => {
+                const div = document.getElementById(`comments-${placeId}`);
+                if(!div) return;
+                div.innerHTML = '';
+                snapshot.forEach((docSnap) => {
+                    const c = docSnap.data();
+                    div.innerHTML += `<p><strong class="text-gray-800">${c.nombre}:</strong> <span class="text-gray-600">${c.mensaje}</span></p>`;
+                });
+            });
+        }
+
+        // Inicializar carga
+        loadPlaces();
+    </script>
+</body>
+</html>
