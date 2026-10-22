@@ -5,46 +5,98 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Descubre Los Lagos</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS para el Mapa -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        #map { height: 350px; width: 100%; border-radius: 0.75rem; z-index: 1; }
+    </style>
 </head>
-<body class="bg-gray-100 text-gray-800">
+<body class="bg-gray-100 text-gray-800 pb-12">
 
     <!-- Navegación -->
-    <nav class="bg-emerald-600 text-white p-4 shadow-md flex justify-between items-center">
-        <h1 class="text-2xl font-bold">📍 Descubre Los Lagos</h1>
-        <button id="btnLogin" class="bg-emerald-800 px-4 py-2 rounded hover:bg-emerald-700">Acceso Admin</button>
-        <button id="btnLogout" class="hidden bg-red-600 px-4 py-2 rounded hover:bg-red-500">Cerrar Sesión</button>
+    <nav class="bg-emerald-600 text-white p-4 shadow-md flex justify-between items-center sticky top-0 z-50">
+        <h1 class="text-2xl font-bold flex items-center gap-2">📍 Descubre Los Lagos</h1>
+        <div>
+            <button id="btnLogin" class="bg-emerald-800 px-4 py-2 rounded hover:bg-emerald-700 text-sm font-semibold">Acceso Admin</button>
+            <button id="btnLogout" class="hidden bg-red-600 px-4 py-2 rounded hover:bg-red-500 text-sm font-semibold">Cerrar Sesión</button>
+        </div>
     </nav>
 
     <!-- Estado de Ubicación -->
     <div id="locationStatus" class="bg-blue-100 text-blue-800 p-2 text-center text-sm font-semibold">
-        Calculando tu ubicación...
+        📡 Obteniendo tu ubicación GPS...
     </div>
 
-    <!-- Panel de Administrador (Oculto por defecto) -->
-    <div id="adminPanel" class="hidden max-w-4xl mx-auto mt-6 bg-white p-6 rounded-lg shadow-md border-2 border-emerald-500">
-        <h2 class="text-xl font-bold mb-4 text-emerald-600">Panel de Administrador: Agregar Punto Turístico</h2>
-        <form id="addPlaceForm" class="space-y-4">
-            <input type="text" id="placeName" placeholder="Nombre del lugar (Ej: Salto del Collilelfu)" class="w-full p-2 border rounded" required>
-            <textarea id="placeDesc" placeholder="Descripción del lugar" class="w-full p-2 border rounded" required></textarea>
-            <input type="url" id="placeImage" placeholder="URL de la imagen" class="w-full p-2 border rounded" required>
-            <div class="flex gap-4">
-                <input type="number" id="placeLat" step="any" placeholder="Latitud (Ej: -39.85)" class="w-1/2 p-2 border rounded" required>
-                <input type="number" id="placeLng" step="any" placeholder="Longitud (Ej: -72.80)" class="w-1/2 p-2 border rounded" required>
-            </div>
-            <button type="submit" class="bg-emerald-600 text-white px-4 py-2 rounded w-full font-bold">Publicar Lugar</button>
-        </form>
+    <!-- Contenedor Principal -->
+    <div class="max-w-5xl mx-auto p-4 space-y-6">
+
+        <!-- Mapa Interactivo -->
+        <section class="bg-white p-4 rounded-xl shadow-md border border-gray-200">
+            <h2 class="text-lg font-bold mb-3 text-emerald-700 flex items-center gap-2">
+                🗺️ Mapa de Puntos Turísticos y Servicios
+            </h2>
+            <div id="map"></div>
+        </section>
+
+        <!-- Filtros por Categoría -->
+        <section class="flex flex-wrap gap-2 justify-center items-center bg-white p-4 rounded-xl shadow-sm border">
+            <span class="text-sm font-bold text-gray-600 mr-2">Filtrar por:</span>
+            <button onclick="filterCategory('Todas')" class="filter-btn bg-emerald-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm">Todas</button>
+            <button onclick="filterCategory('Turismo')" class="filter-btn bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm font-semibold hover:bg-emerald-100">🏔️ Turismo</button>
+            <button onclick="filterCategory('Cajeros')" class="filter-btn bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm font-semibold hover:bg-emerald-100">🏧 Cajeros / Banco</button>
+            <button onclick="filterCategory('Gastronomía')" class="filter-btn bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm font-semibold hover:bg-emerald-100">🍽️ Gastronomía</button>
+            <button onclick="filterCategory('Alojamiento')" class="filter-btn bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm font-semibold hover:bg-emerald-100">🏨 Alojamiento</button>
+            <button onclick="filterCategory('Otros')" class="filter-btn bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm font-semibold hover:bg-emerald-100">📌 Otros</button>
+        </section>
+
+        <!-- Panel de Administrador -->
+        <div id="adminPanel" class="hidden bg-white p-6 rounded-xl shadow-md border-2 border-emerald-500">
+            <h2 id="formTitle" class="text-xl font-bold mb-4 text-emerald-600">Panel Admin: Agregar Punto</h2>
+            <form id="placeForm" class="space-y-4">
+                <input type="hidden" id="editPlaceId" value="">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="text" id="placeName" placeholder="Nombre (Ej: Cajero BancoEstado Centro)" class="p-2 border rounded w-full" required>
+                    <select id="placeCategory" class="p-2 border rounded w-full bg-white" required>
+                        <option value="Turismo">🏔️ Atractivo Turístico</option>
+                        <option value="Cajeros">🏧 Cajero / Banco</option>
+                        <option value="Gastronomía">🍽️ Gastronomía</option>
+                        <option value="Alojamiento">🏨 Alojamiento</option>
+                        <option value="Otros">📌 Otro Servicio</option>
+                    </select>
+                </div>
+
+                <textarea id="placeDesc" placeholder="Descripción breve" class="w-full p-2 border rounded" required></textarea>
+                
+                <input type="url" id="placeImage" placeholder="URL directa de la imagen (ej: https://i.imgur.com/ejemplo.jpg)" class="w-full p-2 border rounded" required>
+                <p class="text-xs text-gray-500">💡 Tip: Puedes subir imágenes gratis en <a href="https://imgbb.com" target="_blank" class="text-emerald-600 underline">imgbb.com</a> y copiar el "Enlace directo".</p>
+
+                <div class="flex gap-4">
+                    <input type="number" id="placeLat" step="any" placeholder="Latitud (Ej: -39.8512)" class="w-1/2 p-2 border rounded" required>
+                    <input type="number" id="placeLng" step="any" placeholder="Longitud (Ej: -72.8234)" class="w-1/2 p-2 border rounded" required>
+                </div>
+
+                <div class="flex gap-2">
+                    <button type="submit" id="btnSubmitForm" class="bg-emerald-600 text-white px-4 py-2 rounded w-full font-bold hover:bg-emerald-700">Publicar</button>
+                    <button type="button" id="btnCancelEdit" class="hidden bg-gray-500 text-white px-4 py-2 rounded font-bold hover:bg-gray-600">Cancelar</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Contenedor de Tarjetas -->
+        <main id="placesContainer" class="grid gap-6"></main>
     </div>
 
-    <!-- Contenedor de Lugares -->
-    <main id="placesContainer" class="max-w-4xl mx-auto mt-8 grid gap-8 p-4"></main>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <!-- Scripts de Firebase (Módulos) -->
+    <!-- Scripts de Firebase -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-auth.js";
 
-        // 🔥 REEMPLAZA ESTO CON TU CONFIGURACIÓN DE FIREBASE
+        // 🔥 REEMPLAZA ESTE OBJETO CON TUS CREDENCIALES
         const firebaseConfig = {
             apiKey: "AIzaSyBqZOhs1PmGO0hfO-9g0q3k5exw8KkxpzM",
             authDomain: "turismo-los-lagos.firebaseapp.com",
@@ -60,125 +112,229 @@
 
         let userLocation = null;
         let isAdmin = false;
+        let allPlaces = [];
+        let currentFilter = 'Todas';
+        let map, userMarker;
+        let mapMarkers = [];
 
-        // 1. Geolocalización
+        // Inicializar Mapa centrado en Los Lagos
+        map = L.map('map').setView([-39.85, -72.82], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        // Geolocalización
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     userLocation = { lat: position.coords.latitude, lng: position.coords.longitude };
-                    document.getElementById('locationStatus').innerText = "📍 Ubicación detectada. Distancias calculadas correctamente.";
+                    document.getElementById('locationStatus').innerText = "📍 Ubicación detectada. Distancias calculadas en tiempo real.";
                     document.getElementById('locationStatus').className = "bg-green-100 text-green-800 p-2 text-center text-sm font-semibold";
-                    loadPlaces(); // Recargar para mostrar distancias
+                    
+                    // Marcador de Ubicación Actual en el Mapa
+                    const userIcon = L.divIcon({
+                        className: 'custom-user-icon',
+                        html: '<div style="background-color:#2563eb; width:16px; height:16px; border-radius:50%; border:3px solid white; box-shadow:0 0 8px rgba(0,0,0,0.4);"></div>'
+                    });
+                    userMarker = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon }).addTo(map)
+                        .bindPopup("<b>Tu ubicación actual</b>").openPopup();
+                    
+                    map.setView([userLocation.lat, userLocation.lng], 12);
+                    renderPlaces();
                 },
                 () => {
-                    document.getElementById('locationStatus').innerText = "⚠️ No se pudo obtener tu ubicación. Las distancias no se mostrarán.";
+                    document.getElementById('locationStatus').innerText = "⚠️ Permiso de ubicación denegado. Se mostrará el mapa sin tu posición.";
                     document.getElementById('locationStatus').className = "bg-yellow-100 text-yellow-800 p-2 text-center text-sm font-semibold";
                 }
             );
         }
 
-        // Fórmula Haversine para calcular distancia en km
         function calculateDistance(lat1, lon1, lat2, lon2) {
             if (!lat1 || !lon1) return null;
-            const R = 6371; 
+            const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
             const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
                       Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
                       Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            return (R * c).toFixed(1);
+            return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1);
         }
 
-        // 2. Autenticación de Administrador
-        const btnLogin = document.getElementById('btnLogin');
-        const btnLogout = document.getElementById('btnLogout');
-        const adminPanel = document.getElementById('adminPanel');
-
-        btnLogin.addEventListener('click', () => {
-            const email = prompt("Correo de administrador:");
+        // Auth
+        document.getElementById('btnLogin').addEventListener('click', () => {
+            const email = prompt("Correo Admin:");
             const password = prompt("Contraseña:");
             if (email && password) signInWithEmailAndPassword(auth, email, password).catch(e => alert("Error: " + e.message));
         });
-
-        btnLogout.addEventListener('click', () => signOut(auth));
+        document.getElementById('btnLogout').addEventListener('click', () => signOut(auth));
 
         onAuthStateChanged(auth, (user) => {
             isAdmin = !!user;
-            btnLogin.style.display = user ? 'none' : 'block';
-            btnLogout.style.display = user ? 'block' : 'none';
-            adminPanel.style.display = user ? 'block' : 'none';
+            document.getElementById('btnLogin').style.display = user ? 'none' : 'block';
+            document.getElementById('btnLogout').style.display = user ? 'block' : 'none';
+            document.getElementById('adminPanel').style.display = user ? 'block' : 'none';
+            renderPlaces();
         });
 
-        // 3. Agregar Lugar (Admin)
-        document.getElementById('addPlaceForm').addEventListener('submit', async (e) => {
+        // Guardar o Editar Lugar
+        const placeForm = document.getElementById('placeForm');
+        placeForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            if(!isAdmin) return alert("Debes ser administrador");
+            if(!isAdmin) return alert("Requiere permisos de administrador");
+
+            const editId = document.getElementById('editPlaceId').value;
+            const data = {
+                nombre: document.getElementById('placeName').value,
+                categoria: document.getElementById('placeCategory').value,
+                descripcion: document.getElementById('placeDesc').value,
+                imagen: document.getElementById('placeImage').value,
+                lat: parseFloat(document.getElementById('placeLat').value),
+                lng: parseFloat(document.getElementById('placeLng').value),
+            };
+
             try {
-                await addDoc(collection(db, "lugares"), {
-                    nombre: document.getElementById('placeName').value,
-                    descripcion: document.getElementById('placeDesc').value,
-                    imagen: document.getElementById('placeImage').value,
-                    lat: parseFloat(document.getElementById('placeLat').value),
-                    lng: parseFloat(document.getElementById('placeLng').value),
-                    fecha: new Date()
-                });
-                e.target.reset();
-                alert("Lugar agregado exitosamente");
+                if (editId) {
+                    await updateDoc(doc(db, "lugares", editId), data);
+                    alert("Lugar actualizado correctamente");
+                } else {
+                    data.fecha = new Date();
+                    await addDoc(collection(db, "lugares"), data);
+                    alert("Lugar agregado exitosamente");
+                }
+                resetForm();
             } catch (error) {
-                alert("Error al guardar: " + error.message);
+                alert("Error: " + error.message);
             }
         });
 
-        // 4. Cargar y Mostrar Lugares
-        function loadPlaces() {
-            const q = query(collection(db, "lugares"), orderBy("fecha", "desc"));
-            onSnapshot(q, (snapshot) => {
-                const container = document.getElementById('placesContainer');
-                container.innerHTML = '';
-                
-                snapshot.forEach((docSnap) => {
-                    const place = docSnap.data();
-                    const placeId = docSnap.id;
-                    
-                    let distanciaTexto = "";
-                    if (userLocation) {
-                        const dist = calculateDistance(userLocation.lat, userLocation.lng, place.lat, place.lng);
-                        distanciaTexto = `<span class="bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-sm font-bold">A ${dist} km de ti</span>`;
-                    }
+        document.getElementById('btnCancelEdit').addEventListener('click', resetForm);
 
-                    const article = document.createElement('article');
-                    article.className = "bg-white rounded-lg shadow-md overflow-hidden flex flex-col md:flex-row";
-                    article.innerHTML = `
-                        <img src="${place.imagen}" alt="${place.nombre}" class="w-full md:w-1/3 object-cover h-48 md:h-auto">
-                        <div class="p-6 flex-1">
-                            <div class="flex justify-between items-start mb-2">
-                                <h3 class="text-2xl font-bold">${place.nombre}</h3>
-                                ${distanciaTexto}
-                            </div>
-                            <p class="text-gray-600 mb-4">${place.descripcion}</p>
-                            
-                            <!-- Sección de Comentarios -->
-                            <div class="mt-4 pt-4 border-t border-gray-200">
-                                <h4 class="font-bold mb-2">Comentarios</h4>
-                                <div id="comments-${placeId}" class="space-y-2 mb-4 max-h-32 overflow-y-auto text-sm"></div>
-                                
-                                <form onsubmit="addComment(event, '${placeId}')" class="flex flex-col gap-2">
-                                    <input type="text" id="name-${placeId}" placeholder="Tu nombre" class="p-1 border rounded text-sm" required>
-                                    <input type="email" id="email-${placeId}" placeholder="Tu correo" class="p-1 border rounded text-sm" required>
-                                    <input type="text" id="msg-${placeId}" placeholder="Tu comentario" class="p-1 border rounded text-sm" required>
-                                    <button type="submit" class="bg-gray-800 text-white p-1 rounded hover:bg-gray-700 text-sm">Comentar</button>
-                                </form>
-                            </div>
+        function resetForm() {
+            placeForm.reset();
+            document.getElementById('editPlaceId').value = "";
+            document.getElementById('formTitle').innerText = "Panel Admin: Agregar Punto";
+            document.getElementById('btnSubmitForm').innerText = "Publicar";
+            document.getElementById('btnCancelEdit').classList.add('hidden');
+        }
+
+        // Firestore Realtime listener
+        const q = query(collection(db, "lugares"), orderBy("fecha", "desc"));
+        onSnapshot(q, (snapshot) => {
+            allPlaces = [];
+            snapshot.forEach((docSnap) => {
+                allPlaces.push({ id: docSnap.id, ...docSnap.data() });
+            });
+            renderPlaces();
+        });
+
+        window.filterCategory = function(cat) {
+            currentFilter = cat;
+            renderPlaces();
+        };
+
+        function renderPlaces() {
+            const container = document.getElementById('placesContainer');
+            container.innerHTML = '';
+
+            // Limpiar marcadores antiguos en el mapa
+            mapMarkers.forEach(m => map.removeLayer(m));
+            mapMarkers = [];
+
+            const filtered = currentFilter === 'Todas' 
+                ? allPlaces 
+                : allPlaces.filter(p => p.categoria === currentFilter);
+
+            filtered.forEach((place) => {
+                // Agregar Pin al Mapa
+                const marker = L.marker([place.lat, place.lng]).addTo(map)
+                    .bindPopup(`<b>${place.nombre}</b><br>${place.categoria || ''}`);
+                mapMarkers.push(marker);
+
+                // Calcular Distancia
+                let distHtml = "";
+                if (userLocation) {
+                    const dist = calculateDistance(userLocation.lat, userLocation.lng, place.lat, place.lng);
+                    distHtml = `<span class="bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-xs font-bold">A ${dist} km de ti</span>`;
+                }
+
+                // Botones Admin
+                let adminBtns = "";
+                if (isAdmin) {
+                    adminBtns = `
+                        <div class="flex gap-2 mt-2 pt-2 border-t">
+                            <button onclick="editPlace('${place.id}')" class="bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-blue-500">Editar</button>
+                            <button onclick="deletePlace('${place.id}')" class="bg-red-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-red-500">Eliminar</button>
                         </div>
                     `;
-                    container.appendChild(article);
-                    loadComments(placeId);
-                });
+                }
+
+                const article = document.createElement('article');
+                article.className = "bg-white rounded-xl shadow-md overflow-hidden flex flex-col md:flex-row border border-gray-100";
+                article.innerHTML = `
+                    <img src="${place.imagen}" alt="${place.nombre}" class="w-full md:w-1/3 object-cover h-48 md:h-auto" onerror="this.src='https://via.placeholder.com/400x300?text=Sin+Imagen'">
+                    <div class="p-5 flex-1 flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-start mb-2">
+                                <div>
+                                    <span class="text-xs uppercase tracking-wide font-bold text-emerald-600">${place.categoria || 'Turismo'}</span>
+                                    <h3 class="text-xl font-bold">${place.nombre}</h3>
+                                </div>
+                                ${distHtml}
+                            </div>
+                            <p class="text-gray-600 text-sm mb-4">${place.descripcion}</p>
+                        </div>
+
+                        ${adminBtns}
+
+                        <!-- Comentarios -->
+                        <div class="mt-4 pt-4 border-t border-gray-100">
+                            <h4 class="font-bold text-sm mb-2 text-gray-700">Comentarios</h4>
+                            <div id="comments-${place.id}" class="space-y-1 mb-3 max-h-28 overflow-y-auto text-xs text-gray-600"></div>
+                            
+                            <form onsubmit="addComment(event, '${place.id}')" class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                <input type="text" id="name-${place.id}" placeholder="Tu nombre" class="p-1 border rounded text-xs" required>
+                                <input type="email" id="email-${place.id}" placeholder="Tu correo" class="p-1 border rounded text-xs" required>
+                                <input type="text" id="msg-${place.id}" placeholder="Comentario" class="p-1 border rounded text-xs md:col-span-3" required>
+                                <button type="submit" class="bg-gray-800 text-white p-1 rounded hover:bg-gray-700 text-xs md:col-span-3 font-semibold">Comentar</button>
+                            </form>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(article);
+                loadComments(place.id);
             });
         }
 
-        // 5. Cargar y Agregar Comentarios
+        // Operaciones Admin
+        window.editPlace = function(id) {
+            const p = allPlaces.find(item => item.id === id);
+            if (!p) return;
+            document.getElementById('editPlaceId').value = p.id;
+            document.getElementById('placeName').value = p.nombre;
+            document.getElementById('placeCategory').value = p.categoria || 'Turismo';
+            document.getElementById('placeDesc').value = p.descripcion;
+            document.getElementById('placeImage').value = p.imagen;
+            document.getElementById('placeLat').value = p.lat;
+            document.getElementById('placeLng').value = p.lng;
+
+            document.getElementById('formTitle').innerText = "Editar Punto Turístico";
+            document.getElementById('btnSubmitForm').innerText = "Guardar Cambios";
+            document.getElementById('btnCancelEdit').classList.remove('hidden');
+            window.scrollTo({ top: document.getElementById('adminPanel').offsetTop - 20, behavior: 'smooth' });
+        };
+
+        window.deletePlace = async function(id) {
+            if (confirm("¿Estás seguro de que deseas eliminar este punto?")) {
+                try {
+                    await deleteDoc(doc(db, "lugares", id));
+                    alert("Eliminado con éxito");
+                } catch (e) {
+                    alert("Error al eliminar: " + e.message);
+                }
+            }
+        };
+
+        // Comentarios
         window.addComment = async function(e, placeId) {
             e.preventDefault();
             try {
@@ -202,13 +358,10 @@
                 div.innerHTML = '';
                 snapshot.forEach((docSnap) => {
                     const c = docSnap.data();
-                    div.innerHTML += `<p><strong class="text-gray-800">${c.nombre}:</strong> <span class="text-gray-600">${c.mensaje}</span></p>`;
+                    div.innerHTML += `<p><strong>${c.nombre}:</strong> ${c.mensaje}</p>`;
                 });
             });
         }
-
-        // Inicializar carga
-        loadPlaces();
     </script>
 </body>
 </html>
