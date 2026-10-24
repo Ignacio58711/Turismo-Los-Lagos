@@ -3,100 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Descubre Los Lagos</title>
+    <title>Rayün Ecorefugio - Guía de Huéspedes</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Leaflet CSS para el Mapa -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        #map { height: 350px; width: 100%; border-radius: 0.75rem; z-index: 1; }
+        #map { height: 400px; width: 100%; border-radius: 0.75rem; z-index: 1; }
+        .user-pulse {
+            background-color: #3b82f6; width: 16px; height: 16px; border-radius: 50%;
+            border: 3px solid white; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800 pb-12">
+<body class="bg-[#f4f1ea] text-gray-800 pb-12 font-sans">
 
-    <!-- Navegación -->
-    <nav class="bg-emerald-600 text-white p-4 shadow-md flex justify-between items-center sticky top-0 z-50">
-        <h1 class="text-2xl font-bold flex items-center gap-2">📍 Descubre Los Lagos</h1>
+    <!-- Navegación Rayün -->
+    <nav class="bg-[#2c4c3b] text-[#e8ecd7] p-4 shadow-lg flex justify-between items-center sticky top-0 z-50">
+        <h1 class="text-xl md:text-2xl font-bold flex items-center gap-2">🌲 Rayün Ecorefugio</h1>
         <div>
-            <button id="btnLogin" class="bg-emerald-800 px-4 py-2 rounded hover:bg-emerald-700 text-sm font-semibold">Acceso Admin</button>
-            <button id="btnLogout" class="hidden bg-red-600 px-4 py-2 rounded hover:bg-red-500 text-sm font-semibold">Cerrar Sesión</button>
+            <button id="btnLogin" class="bg-[#1f362a] px-4 py-2 rounded-lg hover:bg-[#15251d] text-sm font-semibold transition">Admin</button>
+            <button id="btnLogout" class="hidden bg-red-700 px-4 py-2 rounded-lg hover:bg-red-600 text-sm font-semibold transition">Salir</button>
         </div>
     </nav>
 
-    <!-- Estado de Ubicación -->
-    <div id="locationStatus" class="bg-blue-100 text-blue-800 p-2 text-center text-sm font-semibold">
-        📡 Obteniendo tu ubicación GPS...
+    <!-- Banner Huéspedes -->
+    <header class="text-center py-6 px-4 bg-white shadow-sm border-b border-[#e5e0d8]">
+        <h2 class="text-2xl font-bold text-[#2c4c3b] mb-2">Bienvenido a tu entorno</h2>
+        <p class="text-gray-600 text-sm max-w-xl mx-auto">Explora los puntos de interés cercanos a tu cabaña. Selecciona un lugar en la lista para trazar la ruta en el mapa.</p>
+    </header>
+
+    <div id="locationStatus" class="bg-blue-50 text-blue-800 p-2 text-center text-sm font-semibold border-b border-blue-100">
+        📡 Buscando señal GPS para guiarte...
     </div>
 
-    <!-- Contenedor Principal -->
-    <div class="max-w-5xl mx-auto p-4 space-y-6">
+    <div class="max-w-6xl mx-auto p-4 space-y-6">
 
-        <!-- Mapa Interactivo -->
-        <section class="bg-white p-4 rounded-xl shadow-md border border-gray-200">
-            <h2 class="text-lg font-bold mb-3 text-emerald-700 flex items-center gap-2">
-                🗺️ Mapa de Puntos Turísticos y Servicios
-            </h2>
+        <!-- Mapa -->
+        <section class="bg-white p-2 rounded-xl shadow-md border border-[#e5e0d8]">
             <div id="map"></div>
         </section>
 
-        <!-- Filtros por Categoría -->
-        <section class="flex flex-wrap gap-2 justify-center items-center bg-white p-4 rounded-xl shadow-sm border">
-            <span class="text-sm font-bold text-gray-600 mr-2">Filtrar por:</span>
-            <button onclick="filterCategory('Todas')" class="filter-btn bg-emerald-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow-sm">Todas</button>
-            <button onclick="filterCategory('Turismo')" class="filter-btn bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm font-semibold hover:bg-emerald-100">🏔️ Turismo</button>
-            <button onclick="filterCategory('Cajeros')" class="filter-btn bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm font-semibold hover:bg-emerald-100">🏧 Cajeros / Banco</button>
-            <button onclick="filterCategory('Gastronomía')" class="filter-btn bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm font-semibold hover:bg-emerald-100">🍽️ Gastronomía</button>
-            <button onclick="filterCategory('Alojamiento')" class="filter-btn bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm font-semibold hover:bg-emerald-100">🏨 Alojamiento</button>
-            <button onclick="filterCategory('Otros')" class="filter-btn bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm font-semibold hover:bg-emerald-100">📌 Otros</button>
+        <!-- Filtros Dinámicos -->
+        <section id="filterContainer" class="flex flex-wrap gap-2 justify-center items-center bg-white p-4 rounded-xl shadow-sm border border-[#e5e0d8]">
+            <span class="text-sm font-bold text-gray-500 mr-2">Explorar:</span>
+            <!-- Los botones se generan aquí -->
         </section>
 
         <!-- Panel de Administrador -->
-        <div id="adminPanel" class="hidden bg-white p-6 rounded-xl shadow-md border-2 border-emerald-500">
-            <h2 id="formTitle" class="text-xl font-bold mb-4 text-emerald-600">Panel Admin: Agregar Punto</h2>
-            <form id="placeForm" class="space-y-4">
-                <input type="hidden" id="editPlaceId" value="">
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input type="text" id="placeName" placeholder="Nombre (Ej: Cajero BancoEstado Centro)" class="p-2 border rounded w-full" required>
-                    <select id="placeCategory" class="p-2 border rounded w-full bg-white" required>
-                        <option value="Turismo">🏔️ Atractivo Turístico</option>
-                        <option value="Cajeros">🏧 Cajero / Banco</option>
-                        <option value="Gastronomía">🍽️ Gastronomía</option>
-                        <option value="Alojamiento">🏨 Alojamiento</option>
-                        <option value="Otros">📌 Otro Servicio</option>
-                    </select>
-                </div>
+        <div id="adminPanel" class="hidden bg-white p-6 rounded-xl shadow-lg border-l-4 border-[#2c4c3b] grid md:grid-cols-3 gap-8">
+            
+            <!-- Formulario Puntos -->
+            <div class="md:col-span-2">
+                <h2 id="formTitle" class="text-xl font-bold mb-4 text-[#2c4c3b]">📍 Agregar Punto a la Guía</h2>
+                <form id="placeForm" class="space-y-4">
+                    <input type="hidden" id="editPlaceId" value="">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="text" id="placeName" placeholder="Nombre del destino" class="p-2 bg-gray-50 border rounded w-full" required>
+                        <select id="placeCategory" class="p-2 bg-gray-50 border rounded w-full" required></select>
+                    </div>
+                    <textarea id="placeDesc" placeholder="Descripción para los huéspedes" class="w-full p-2 bg-gray-50 border rounded" required></textarea>
+                    <input type="url" id="placeImage" placeholder="URL directa de la imagen" class="w-full p-2 bg-gray-50 border rounded" required>
+                    <div class="flex gap-4">
+                        <input type="number" id="placeLat" step="any" placeholder="Latitud" class="w-1/2 p-2 bg-gray-50 border rounded" required>
+                        <input type="number" id="placeLng" step="any" placeholder="Longitud" class="w-1/2 p-2 bg-gray-50 border rounded" required>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="submit" id="btnSubmitForm" class="bg-[#2c4c3b] text-white px-4 py-2 rounded w-full font-bold hover:bg-[#1f362a]">Publicar Destino</button>
+                        <button type="button" id="btnCancelEdit" class="hidden bg-gray-500 text-white px-4 py-2 rounded font-bold">Cancelar</button>
+                    </div>
+                </form>
+            </div>
 
-                <textarea id="placeDesc" placeholder="Descripción breve" class="w-full p-2 border rounded" required></textarea>
-                
-                <input type="url" id="placeImage" placeholder="URL directa de la imagen (ej: https://i.imgur.com/ejemplo.jpg)" class="w-full p-2 border rounded" required>
-                <p class="text-xs text-gray-500">💡 Tip: Puedes subir imágenes gratis en <a href="https://imgbb.com" target="_blank" class="text-emerald-600 underline">imgbb.com</a> y copiar el "Enlace directo".</p>
-
-                <div class="flex gap-4">
-                    <input type="number" id="placeLat" step="any" placeholder="Latitud (Ej: -39.8512)" class="w-1/2 p-2 border rounded" required>
-                    <input type="number" id="placeLng" step="any" placeholder="Longitud (Ej: -72.8234)" class="w-1/2 p-2 border rounded" required>
-                </div>
-
-                <div class="flex gap-2">
-                    <button type="submit" id="btnSubmitForm" class="bg-emerald-600 text-white px-4 py-2 rounded w-full font-bold hover:bg-emerald-700">Publicar</button>
-                    <button type="button" id="btnCancelEdit" class="hidden bg-gray-500 text-white px-4 py-2 rounded font-bold hover:bg-gray-600">Cancelar</button>
-                </div>
-            </form>
+            <!-- Gestión de Categorías -->
+            <div class="border-t md:border-t-0 md:border-l border-gray-200 pt-6 md:pt-0 md:pl-6">
+                <h2 class="text-lg font-bold mb-4 text-[#2c4c3b]">🏷️ Tus Categorías</h2>
+                <form id="catForm" class="flex gap-2 mb-4">
+                    <input type="text" id="catName" placeholder="Nueva categoría" class="p-2 bg-gray-50 border rounded w-full text-sm" required>
+                    <button type="submit" class="bg-[#2c4c3b] text-white px-3 py-2 rounded font-bold text-sm">+</button>
+                </form>
+                <ul id="adminCatList" class="space-y-2 text-sm max-h-48 overflow-y-auto pr-2"></ul>
+            </div>
         </div>
 
         <!-- Contenedor de Tarjetas -->
-        <main id="placesContainer" class="grid gap-6"></main>
+        <main id="placesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6"></main>
     </div>
 
-    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-    <!-- Scripts de Firebase -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-app.js";
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-auth.js";
 
-        // 🔥 REEMPLAZA ESTE OBJETO CON TUS CREDENCIALES
+        // CREDENCIALES
         const firebaseConfig = {
             apiKey: "AIzaSyBqZOhs1PmGO0hfO-9g0q3k5exw8KkxpzM",
             authDomain: "turismo-los-lagos.firebaseapp.com",
@@ -113,52 +117,62 @@
         let userLocation = null;
         let isAdmin = false;
         let allPlaces = [];
+        let allCategories = [];
         let currentFilter = 'Todas';
-        let map, userMarker;
+        let map, userMarker, routeLayer;
         let mapMarkers = [];
 
-        // Inicializar Mapa centrado en Los Lagos
-        map = L.map('map').setView([-39.85, -72.82], 12);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
+        // Inicializar Mapa
+        map = L.map('map').setView([-39.85, -72.82], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
 
-        // Geolocalización
+        // Seguimiento GPS en Tiempo Real
         if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
+            navigator.geolocation.watchPosition(
                 (position) => {
                     userLocation = { lat: position.coords.latitude, lng: position.coords.longitude };
-                    document.getElementById('locationStatus').innerText = "📍 Ubicación detectada. Distancias calculadas en tiempo real.";
-                    document.getElementById('locationStatus').className = "bg-green-100 text-green-800 p-2 text-center text-sm font-semibold";
+                    document.getElementById('locationStatus').innerText = "📍 Ubicación conectada. Eres el punto azul en el mapa.";
+                    document.getElementById('locationStatus').className = "bg-green-50 text-green-800 p-2 text-center text-sm font-semibold border-b border-green-100";
                     
-                    // Marcador de Ubicación Actual en el Mapa
-                    const userIcon = L.divIcon({
-                        className: 'custom-user-icon',
-                        html: '<div style="background-color:#2563eb; width:16px; height:16px; border-radius:50%; border:3px solid white; box-shadow:0 0 8px rgba(0,0,0,0.4);"></div>'
-                    });
-                    userMarker = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon }).addTo(map)
-                        .bindPopup("<b>Tu ubicación actual</b>").openPopup();
-                    
-                    map.setView([userLocation.lat, userLocation.lng], 12);
-                    renderPlaces();
+                    if(userMarker) {
+                        userMarker.setLatLng([userLocation.lat, userLocation.lng]);
+                    } else {
+                        const userIcon = L.divIcon({ className: 'custom-user-icon', html: '<div class="user-pulse"></div>' });
+                        userMarker = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon, zIndexOffset: 1000 }).addTo(map)
+                            .bindPopup("<b>Tú estás aquí</b>").openPopup();
+                        map.setView([userLocation.lat, userLocation.lng], 14);
+                    }
+                    renderPlaces(); // Actualizar distancias si te mueves
                 },
-                () => {
-                    document.getElementById('locationStatus').innerText = "⚠️ Permiso de ubicación denegado. Se mostrará el mapa sin tu posición.";
-                    document.getElementById('locationStatus').className = "bg-yellow-100 text-yellow-800 p-2 text-center text-sm font-semibold";
-                }
+                (err) => {
+                    document.getElementById('locationStatus').innerText = "⚠️ Activa el GPS para trazar rutas desde tu ubicación.";
+                    document.getElementById('locationStatus').className = "bg-yellow-50 text-yellow-800 p-2 text-center text-sm font-semibold";
+                },
+                { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
             );
         }
 
-        function calculateDistance(lat1, lon1, lat2, lon2) {
-            if (!lat1 || !lon1) return null;
-            const R = 6371;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1);
-        }
+        // Trazar Ruta (OSRM API)
+        window.traceRoute = async function(destLat, destLng, placeName) {
+            if (!userLocation) return alert("Necesitamos acceso a tu GPS para calcular la ruta.");
+            
+            if (routeLayer) map.removeLayer(routeLayer);
+            
+            try {
+                const url = `https://router.project-osrm.org/route/v1/driving/${userLocation.lng},${userLocation.lat};${destLng},${destLat}?geometries=geojson`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if(data.routes && data.routes.length > 0) {
+                    const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+                    routeLayer = L.polyline(coords, { color: '#2c4c3b', weight: 5, opacity: 0.8, dashArray: '10, 10' }).addTo(map);
+                    map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
+                }
+            } catch (e) {
+                alert("No se pudo calcular la ruta en este momento.");
+            }
+            window.scrollTo({ top: document.getElementById('map').offsetTop - 80, behavior: 'smooth' });
+        };
 
         // Auth
         document.getElementById('btnLogin').addEventListener('click', () => {
@@ -172,15 +186,75 @@
             isAdmin = !!user;
             document.getElementById('btnLogin').style.display = user ? 'none' : 'block';
             document.getElementById('btnLogout').style.display = user ? 'block' : 'none';
-            document.getElementById('adminPanel').style.display = user ? 'block' : 'none';
+            document.getElementById('adminPanel').style.display = user ? 'grid' : 'none';
             renderPlaces();
+            renderCategories();
         });
 
-        // Guardar o Editar Lugar
-        const placeForm = document.getElementById('placeForm');
-        placeForm.addEventListener('submit', async (e) => {
+        // ---------------- CATEGORÍAS (CRUD) ----------------
+        onSnapshot(collection(db, "categorias"), (snapshot) => {
+            allCategories = [];
+            snapshot.forEach(doc => allCategories.push({ id: doc.id, nombre: doc.data().nombre }));
+            allCategories.sort((a,b) => a.nombre.localeCompare(b.nombre));
+            renderCategories();
+            renderPlaces(); // Recargar filtros
+        });
+
+        document.getElementById('catForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            if(!isAdmin) return alert("Requiere permisos de administrador");
+            if(!isAdmin) return;
+            const input = document.getElementById('catName');
+            await addDoc(collection(db, "categorias"), { nombre: input.value });
+            input.value = "";
+        });
+
+        window.deleteCategory = async function(id) {
+            if(confirm("¿Eliminar categoría? Los lugares que la usen quedarán sin categoría.")) {
+                await deleteDoc(doc(db, "categorias", id));
+            }
+        };
+
+        function renderCategories() {
+            // Select de formulario
+            const select = document.getElementById('placeCategory');
+            select.innerHTML = '<option value="">Selecciona una categoría...</option>';
+            
+            // Botones de filtro público
+            const filterContainer = document.getElementById('filterContainer');
+            filterContainer.innerHTML = `<span class="text-sm font-bold text-gray-500 mr-2">Explorar:</span>
+                <button onclick="filterCategory('Todas')" class="${currentFilter === 'Todas' ? 'bg-[#2c4c3b] text-white' : 'bg-gray-200 text-gray-700'} px-3 py-1 rounded-full text-sm font-semibold transition">Todas</button>`;
+
+            // Lista Admin
+            const adminList = document.getElementById('adminCatList');
+            adminList.innerHTML = '';
+
+            allCategories.forEach(c => {
+                // Agregar a Select
+                select.innerHTML += `<option value="${c.nombre}">${c.nombre}</option>`;
+                
+                // Agregar a Filtros
+                const isSelected = currentFilter === c.nombre ? 'bg-[#2c4c3b] text-white' : 'bg-gray-200 text-gray-700 hover:bg-[#e8ecd7]';
+                filterContainer.innerHTML += `<button onclick="filterCategory('${c.nombre}')" class="${isSelected} px-3 py-1 rounded-full text-sm font-semibold transition">${c.nombre}</button>`;
+
+                // Agregar a Lista Admin
+                if(isAdmin) {
+                    adminList.innerHTML += `<li class="flex justify-between items-center bg-gray-50 p-2 rounded border">
+                        ${c.nombre} <button onclick="deleteCategory('${c.id}')" class="text-red-600 font-bold hover:text-red-800">X</button>
+                    </li>`;
+                }
+            });
+        }
+
+        window.filterCategory = function(cat) {
+            currentFilter = cat;
+            renderCategories(); // Actualizar colores de botones
+            renderPlaces();
+        };
+
+        // ---------------- LUGARES (CRUD) ----------------
+        document.getElementById('placeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if(!isAdmin) return;
 
             const editId = document.getElementById('editPlaceId').value;
             const data = {
@@ -195,173 +269,105 @@
             try {
                 if (editId) {
                     await updateDoc(doc(db, "lugares", editId), data);
-                    alert("Lugar actualizado correctamente");
                 } else {
                     data.fecha = new Date();
                     await addDoc(collection(db, "lugares"), data);
-                    alert("Lugar agregado exitosamente");
                 }
                 resetForm();
-            } catch (error) {
-                alert("Error: " + error.message);
-            }
+            } catch (error) { alert("Error: " + error.message); }
         });
 
         document.getElementById('btnCancelEdit').addEventListener('click', resetForm);
 
         function resetForm() {
-            placeForm.reset();
+            document.getElementById('placeForm').reset();
             document.getElementById('editPlaceId').value = "";
-            document.getElementById('formTitle').innerText = "Panel Admin: Agregar Punto";
-            document.getElementById('btnSubmitForm').innerText = "Publicar";
+            document.getElementById('formTitle').innerText = "📍 Agregar Punto a la Guía";
+            document.getElementById('btnSubmitForm').innerText = "Publicar Destino";
             document.getElementById('btnCancelEdit').classList.add('hidden');
         }
 
-        // Firestore Realtime listener
-        const q = query(collection(db, "lugares"), orderBy("fecha", "desc"));
-        onSnapshot(q, (snapshot) => {
+        onSnapshot(query(collection(db, "lugares"), orderBy("fecha", "desc")), (snapshot) => {
             allPlaces = [];
-            snapshot.forEach((docSnap) => {
-                allPlaces.push({ id: docSnap.id, ...docSnap.data() });
-            });
+            snapshot.forEach(docSnap => allPlaces.push({ id: docSnap.id, ...docSnap.data() }));
             renderPlaces();
         });
-
-        window.filterCategory = function(cat) {
-            currentFilter = cat;
-            renderPlaces();
-        };
 
         function renderPlaces() {
             const container = document.getElementById('placesContainer');
             container.innerHTML = '';
-
-            // Limpiar marcadores antiguos en el mapa
             mapMarkers.forEach(m => map.removeLayer(m));
             mapMarkers = [];
 
-            const filtered = currentFilter === 'Todas' 
-                ? allPlaces 
-                : allPlaces.filter(p => p.categoria === currentFilter);
+            const filtered = currentFilter === 'Todas' ? allPlaces : allPlaces.filter(p => p.categoria === currentFilter);
 
             filtered.forEach((place) => {
-                // Agregar Pin al Mapa
                 const marker = L.marker([place.lat, place.lng]).addTo(map)
-                    .bindPopup(`<b>${place.nombre}</b><br>${place.categoria || ''}`);
+                    .bindPopup(`<b>${place.nombre}</b><br><button onclick="traceRoute(${place.lat}, ${place.lng})" class="mt-1 text-xs bg-[#2c4c3b] text-white px-2 py-1 rounded w-full">Ir aquí</button>`);
                 mapMarkers.push(marker);
 
-                // Calcular Distancia
                 let distHtml = "";
                 if (userLocation) {
-                    const dist = calculateDistance(userLocation.lat, userLocation.lng, place.lat, place.lng);
-                    distHtml = `<span class="bg-emerald-100 text-emerald-800 px-2 py-1 rounded text-xs font-bold">A ${dist} km de ti</span>`;
+                    const dLat = (place.lat - userLocation.lat) * Math.PI / 180;
+                    const dLon = (place.lng - userLocation.lng) * Math.PI / 180;
+                    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(userLocation.lat * Math.PI / 180) * Math.cos(place.lat * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+                    const dist = (6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1);
+                    distHtml = `<span class="bg-[#e8ecd7] text-[#2c4c3b] px-2 py-1 rounded text-xs font-bold border border-[#c1cc99]">A ${dist} km</span>`;
                 }
 
-                // Botones Admin
-                let adminBtns = "";
-                if (isAdmin) {
-                    adminBtns = `
-                        <div class="flex gap-2 mt-2 pt-2 border-t">
-                            <button onclick="editPlace('${place.id}')" class="bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-blue-500">Editar</button>
-                            <button onclick="deletePlace('${place.id}')" class="bg-red-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-red-500">Eliminar</button>
+                let adminBtns = isAdmin ? `
+                    <div class="flex gap-2 mt-2 pt-2 border-t border-[#e5e0d8]">
+                        <button onclick="editPlace('${place.id}')" class="text-blue-600 text-xs font-bold hover:underline">Editar</button>
+                        <button onclick="deletePlace('${place.id}')" class="text-red-600 text-xs font-bold hover:underline">Eliminar</button>
+                    </div>` : "";
+
+                container.innerHTML += `
+                    <article class="bg-white rounded-xl shadow-sm overflow-hidden flex flex-col border border-[#e5e0d8]">
+                        <div class="relative h-48">
+                            <img src="${place.imagen}" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/400x200?text=Ray%C3%BCn+Ecorefugio'">
+                            <button onclick="traceRoute(${place.lat}, ${place.lng})" class="absolute bottom-3 right-3 bg-[#2c4c3b] text-white px-3 py-2 rounded-lg text-sm font-bold shadow-lg hover:bg-[#1f362a] transition flex items-center gap-1">
+                                🗺️ Trazar Ruta
+                            </button>
                         </div>
-                    `;
-                }
-
-                const article = document.createElement('article');
-                article.className = "bg-white rounded-xl shadow-md overflow-hidden flex flex-col md:flex-row border border-gray-100";
-                article.innerHTML = `
-                    <img src="${place.imagen}" alt="${place.nombre}" class="w-full md:w-1/3 object-cover h-48 md:h-auto" onerror="this.src='https://via.placeholder.com/400x300?text=Sin+Imagen'">
-                    <div class="p-5 flex-1 flex flex-col justify-between">
-                        <div>
+                        <div class="p-5 flex-1 flex flex-col">
                             <div class="flex justify-between items-start mb-2">
                                 <div>
-                                    <span class="text-xs uppercase tracking-wide font-bold text-emerald-600">${place.categoria || 'Turismo'}</span>
-                                    <h3 class="text-xl font-bold">${place.nombre}</h3>
+                                    <span class="text-[10px] uppercase tracking-wider font-bold text-gray-500">${place.categoria || 'General'}</span>
+                                    <h3 class="text-lg font-bold text-[#2c4c3b] leading-tight">${place.nombre}</h3>
                                 </div>
                                 ${distHtml}
                             </div>
-                            <p class="text-gray-600 text-sm mb-4">${place.descripcion}</p>
+                            <p class="text-gray-600 text-sm mb-4 flex-1">${place.descripcion}</p>
+                            ${adminBtns}
                         </div>
-
-                        ${adminBtns}
-
-                        <!-- Comentarios -->
-                        <div class="mt-4 pt-4 border-t border-gray-100">
-                            <h4 class="font-bold text-sm mb-2 text-gray-700">Comentarios</h4>
-                            <div id="comments-${place.id}" class="space-y-1 mb-3 max-h-28 overflow-y-auto text-xs text-gray-600"></div>
-                            
-                            <form onsubmit="addComment(event, '${place.id}')" class="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                <input type="text" id="name-${place.id}" placeholder="Tu nombre" class="p-1 border rounded text-xs" required>
-                                <input type="email" id="email-${place.id}" placeholder="Tu correo" class="p-1 border rounded text-xs" required>
-                                <input type="text" id="msg-${place.id}" placeholder="Comentario" class="p-1 border rounded text-xs md:col-span-3" required>
-                                <button type="submit" class="bg-gray-800 text-white p-1 rounded hover:bg-gray-700 text-xs md:col-span-3 font-semibold">Comentar</button>
-                            </form>
-                        </div>
-                    </div>
-                `;
-                container.appendChild(article);
-                loadComments(place.id);
+                    </article>`;
             });
         }
 
-        // Operaciones Admin
         window.editPlace = function(id) {
             const p = allPlaces.find(item => item.id === id);
             if (!p) return;
             document.getElementById('editPlaceId').value = p.id;
             document.getElementById('placeName').value = p.nombre;
-            document.getElementById('placeCategory').value = p.categoria || 'Turismo';
+            
+            // Esperar un poco a que el select tenga las opciones cargadas si no lo estaba
+            setTimeout(() => { document.getElementById('placeCategory').value = p.categoria; }, 50);
+            
             document.getElementById('placeDesc').value = p.descripcion;
             document.getElementById('placeImage').value = p.imagen;
             document.getElementById('placeLat').value = p.lat;
             document.getElementById('placeLng').value = p.lng;
-
-            document.getElementById('formTitle').innerText = "Editar Punto Turístico";
+            document.getElementById('formTitle').innerText = "✏️ Editar Destino";
             document.getElementById('btnSubmitForm').innerText = "Guardar Cambios";
             document.getElementById('btnCancelEdit').classList.remove('hidden');
             window.scrollTo({ top: document.getElementById('adminPanel').offsetTop - 20, behavior: 'smooth' });
         };
 
         window.deletePlace = async function(id) {
-            if (confirm("¿Estás seguro de que deseas eliminar este punto?")) {
-                try {
-                    await deleteDoc(doc(db, "lugares", id));
-                    alert("Eliminado con éxito");
-                } catch (e) {
-                    alert("Error al eliminar: " + e.message);
-                }
+            if (confirm("¿Eliminar este destino de la guía?")) {
+                await deleteDoc(doc(db, "lugares", id));
             }
         };
-
-        // Comentarios
-        window.addComment = async function(e, placeId) {
-            e.preventDefault();
-            try {
-                await addDoc(collection(db, `lugares/${placeId}/comentarios`), {
-                    nombre: document.getElementById(`name-${placeId}`).value,
-                    correo: document.getElementById(`email-${placeId}`).value,
-                    mensaje: document.getElementById(`msg-${placeId}`).value,
-                    fecha: new Date()
-                });
-                e.target.reset();
-            } catch (error) {
-                alert("Error al comentar: " + error.message);
-            }
-        };
-
-        function loadComments(placeId) {
-            const q = query(collection(db, `lugares/${placeId}/comentarios`), orderBy("fecha", "asc"));
-            onSnapshot(q, (snapshot) => {
-                const div = document.getElementById(`comments-${placeId}`);
-                if(!div) return;
-                div.innerHTML = '';
-                snapshot.forEach((docSnap) => {
-                    const c = docSnap.data();
-                    div.innerHTML += `<p><strong>${c.nombre}:</strong> ${c.mensaje}</p>`;
-                });
-            });
-        }
     </script>
 </body>
 </html>
