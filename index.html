@@ -159,7 +159,8 @@
             if (routeLayer) map.removeLayer(routeLayer);
             
             try {
-                const url = `https://router.project-osrm.org/route/v1/driving/${userLocation.lng},${userLocation.lat};${destLng},${destLat}?geometries=geojson`;
+                // Se agregó &overview=full para trazar la ruta exacta por las calles
+                const url = `https://router.project-osrm.org/route/v1/driving/${userLocation.lng},${userLocation.lat};${destLng},${destLat}?geometries=geojson&overview=full`;
                 const response = await fetch(url);
                 const data = await response.json();
                 
