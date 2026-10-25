@@ -124,8 +124,8 @@
 
         // Inicializar Mapa
         map = L.map('map').setView([-39.85, -72.82], 13);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { 
-            attribution: '© OpenStreetMap contributors, © CARTO' 
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { 
+            attribution: '© Esri' 
         }).addTo(map);
 
         // Seguimiento GPS en Tiempo Real
