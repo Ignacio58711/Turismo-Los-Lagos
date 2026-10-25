@@ -124,7 +124,17 @@
         let mapMarkers = [];
 
         // Inicializar Mapa
-        map = L.map('map').setView([-39.85, -72.82], 13);
+        const limitesLosLagos = [
+            [-40.05, -73.10], // Límite Suroeste (hacia Valdivia/Paillaco)
+            [-39.65, -72.40]  // Límite Noreste (hacia Panguipulli/Riñihue)
+        ];
+
+        map = L.map('map', {
+            maxBounds: limitesLosLagos,
+            maxBoundsViscosity: 1.0, // Hace que el límite sea un muro sólido sin rebote
+            minZoom: 10 // Bloquea el zoom para que no puedan alejar demasiado la cámara
+        }).setView([-39.85, -72.82], 13);
+
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             attribution: '© Esri'
         }).addTo(map);
