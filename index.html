@@ -10,7 +10,6 @@
     <style>
         #map { height: 400px; width: 100%; border-radius: 0.75rem; z-index: 1; }
         
-        /* Animación del GPS */
         .user-pulse {
             background-color: #3b82f6; width: 16px; height: 16px; border-radius: 50%;
             border: 3px solid white; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
@@ -22,18 +21,18 @@
             100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
         }
 
-        /* Estilo para los textos flotantes en el mapa */
+        /* Estilo para los textos flotantes con transición inteligente */
         .map-text-label {
             background: transparent;
             border: none;
             box-shadow: none;
             color: #ffffff;
             font-weight: 800;
-            font-size: 13px;
             text-shadow: 1px 1px 3px #000, -1px -1px 3px #000, 1px -1px 3px #000, -1px 1px 3px #000;
             white-space: nowrap;
             text-align: center;
-            pointer-events: none; /* Permite arrastrar el mapa a través del texto */
+            pointer-events: none;
+            transition: opacity 0.3s ease, font-size 0.3s ease; /* Transición suave al cambiar zoom */
         }
     </style>
 </head>
@@ -68,7 +67,6 @@
         <!-- Filtros Dinámicos -->
         <section id="filterContainer" class="flex flex-wrap gap-2 justify-center items-center bg-white p-4 rounded-xl shadow-sm border border-[#e5e0d8]">
             <span class="text-sm font-bold text-gray-500 mr-2">Explorar:</span>
-            <!-- Los botones se generan aquí -->
         </section>
 
         <!-- Panel de Administrador -->
@@ -98,7 +96,6 @@
 
             <!-- Gestión de Categorías y Textos -->
             <div class="border-t md:border-t-0 md:border-l border-gray-200 pt-6 md:pt-0 md:pl-6 flex flex-col gap-6">
-                
                 <div>
                     <h2 class="text-lg font-bold mb-2 text-[#2c4c3b]">🏷️ Categorías</h2>
                     <form id="catForm" class="flex gap-2 mb-2">
@@ -120,11 +117,9 @@
                     </form>
                     <ul id="adminLabelList" class="space-y-1 text-sm max-h-32 overflow-y-auto pr-2"></ul>
                 </div>
-
             </div>
         </div>
 
-        <!-- Contenedor de Tarjetas -->
         <main id="placesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6"></main>
     </div>
 
@@ -134,7 +129,6 @@
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-auth.js";
 
-        // TUS CREDENCIALES EXACTAS
         const firebaseConfig = {
             apiKey: "AIzaSyBqZOhs1PmGO0hfO-9g0q3k5exw8KkxpzM",
             authDomain: "turismo-los-lagos.firebaseapp.com",
@@ -153,11 +147,16 @@
         let allPlaces = [];
         let allCategories = [];
         let currentFilter = 'Todas';
+        
         let map, userMarker, routeLayer;
         let mapMarkers = [];
         let labelMarkers = [];
 
-        // LÍMITES AMPLIADOS A TODA LA REGIÓN DE LOS RÍOS
+        // VARIABLES PARA NAVEGACIÓN ACTIVA
+        let currentDestination = null;
+        let lastRouteCalcLocation = null;
+        let isFirstRouteDraw = true;
+
         const limitesLosRios = [
             [-40.80, -74.00], 
             [-39.20, -71.50]  
@@ -173,23 +172,51 @@
             attribution: '© Esri'
         }).addTo(map);
 
-        // Seguimiento GPS
+        // FUNCIÓN: Ajustar tamaño y visibilidad de textos según el zoom
+        function adjustLabelsByZoom() {
+            const currentZoom = map.getZoom();
+            const labels = document.querySelectorAll('.map-text-label');
+            labels.forEach(label => {
+                if (currentZoom < 11) {
+                    label.style.opacity = '0'; // Se vuelven invisibles
+                } else if (currentZoom === 11) {
+                    label.style.opacity = '1';
+                    label.style.fontSize = '9px'; // Muy pequeños
+                } else if (currentZoom === 12) {
+                    label.style.opacity = '1';
+                    label.style.fontSize = '12px'; // Medianos
+                } else {
+                    label.style.opacity = '1';
+                    label.style.fontSize = '15px'; // Tamaño normal de lectura
+                }
+            });
+        }
+        map.on('zoomend', adjustLabelsByZoom);
+
+        // GPS: Seguimiento en tiempo real y Recalculación
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition(
                 (position) => {
                     userLocation = { lat: position.coords.latitude, lng: position.coords.longitude };
-                    document.getElementById('locationStatus').innerText = "📍 Ubicación conectada. Eres el punto azul en el mapa.";
+                    document.getElementById('locationStatus').innerText = "📍 Navegación activa. El mapa te está siguiendo.";
                     document.getElementById('locationStatus').className = "bg-green-50 text-green-800 p-2 text-center text-sm font-semibold border-b border-green-100";
                     
                     if(userMarker) {
                         userMarker.setLatLng([userLocation.lat, userLocation.lng]);
+                        // LA CÁMARA SIGUE AL USUARIO AUTOMÁTICAMENTE
+                        map.panTo([userLocation.lat, userLocation.lng], { animate: true });
                     } else {
                         const userIcon = L.divIcon({ className: 'custom-user-icon', html: '<div class="user-pulse"></div>' });
                         userMarker = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon, zIndexOffset: 1000 }).addTo(map)
                             .bindPopup("<b>Tú estás aquí</b>").openPopup();
-                        map.setView([userLocation.lat, userLocation.lng], 12);
+                        map.setView([userLocation.lat, userLocation.lng], 14);
                     }
                     renderPlaces(); 
+
+                    // SI HAY UNA RUTA ACTIVA, RECALCULAR SI HUBO MOVIMIENTO
+                    if (currentDestination) {
+                        calculateAndDrawRoute(); 
+                    }
                 },
                 (err) => {
                     document.getElementById('locationStatus').innerText = "⚠️ Activa el GPS para trazar rutas desde tu ubicación.";
@@ -199,25 +226,53 @@
             );
         }
 
-        // Trazar Ruta
+        // Trazar Ruta (Iniciado por el usuario)
         window.traceRoute = async function(destLat, destLng) {
             if (!userLocation) return alert("Necesitamos acceso a tu GPS para calcular la ruta.");
-            if (routeLayer) map.removeLayer(routeLayer);
+            currentDestination = { lat: destLat, lng: destLng }; // Guardamos el destino
+            isFirstRouteDraw = true;
+            lastRouteCalcLocation = null; // Forzamos el cálculo de la nueva ruta
+            
+            await calculateAndDrawRoute();
+            window.scrollTo({ top: document.getElementById('map').offsetTop - 80, behavior: 'smooth' });
+        };
+
+        // Lógica de cálculo y dibujo de ruta
+        async function calculateAndDrawRoute() {
+            if (!userLocation || !currentDestination) return;
+
+            // Filtro: Solo recalcula si el usuario se movió más de 15 metros para no saturar el mapa
+            if (lastRouteCalcLocation) {
+                const dist = map.distance(
+                    [userLocation.lat, userLocation.lng], 
+                    [lastRouteCalcLocation.lat, lastRouteCalcLocation.lng]
+                );
+                if (dist < 15) return; 
+            }
+            
+            lastRouteCalcLocation = { ...userLocation };
+
             try {
-                const url = `https://router.project-osrm.org/route/v1/driving/${userLocation.lng},${userLocation.lat};${destLng},${destLat}?geometries=geojson&overview=full`;
+                const url = `https://router.project-osrm.org/route/v1/driving/${userLocation.lng},${userLocation.lat};${currentDestination.lng},${currentDestination.lat}?geometries=geojson&overview=full`;
                 const response = await fetch(url);
                 const data = await response.json();
                 
                 if(data.routes && data.routes.length > 0) {
+                    if (routeLayer) map.removeLayer(routeLayer); // Borra la línea anterior si te desviaste
+                    
                     const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
                     routeLayer = L.polyline(coords, { color: '#3b82f6', weight: 6, opacity: 0.9 }).addTo(map);
-                    map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
+                    
+                    // Si es la primera vez que se dibuja, hace zoom para mostrar el trayecto completo
+                    if (isFirstRouteDraw) {
+                        map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
+                        isFirstRouteDraw = false;
+                    }
                 }
             } catch (e) {
-                alert("No se pudo calcular la ruta.");
+                console.log("No se pudo recalcular la ruta en este momento.");
             }
-            window.scrollTo({ top: document.getElementById('map').offsetTop - 80, behavior: 'smooth' });
-        };
+        }
 
         // Auth
         document.getElementById('btnLogin').addEventListener('click', () => {
@@ -234,7 +289,7 @@
             document.getElementById('adminPanel').style.display = user ? 'grid' : 'none';
             renderPlaces();
             renderCategories();
-            renderLabels(); // Recargar textos al loguearse
+            renderLabels();
         });
 
         // ---------------- TEXTOS EN EL MAPA (ETIQUETAS) ----------------
@@ -287,6 +342,8 @@
                     </li>`;
                 }
             });
+            // Aplica los tamaños correctos inmediatamente
+            adjustLabelsByZoom();
         }
 
         // ---------------- CATEGORÍAS ----------------
