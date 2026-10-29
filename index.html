@@ -172,9 +172,16 @@
             minZoom: 8
         }).setView([-39.85, -72.82], 10); 
 
+        // 1. Imagen satelital de fondo
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             attribution: '© Esri'
         }).addTo(map);
+
+        // 2. Trazado automático de calles y carreteras
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}').addTo(map);
+
+        // 3. Nombres de lugares, ríos y fronteras
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}').addTo(map);
 
         // FUNCIÓN: Ajustar tamaño y visibilidad de textos según el zoom
         function adjustLabelsByZoom() {
