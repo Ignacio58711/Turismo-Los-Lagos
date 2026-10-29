@@ -10,6 +10,7 @@
     <style>
         #map { height: 400px; width: 100%; border-radius: 0.75rem; z-index: 1; }
         
+        /* Animación del GPS */
         .user-pulse {
             background-color: #3b82f6; width: 16px; height: 16px; border-radius: 50%;
             border: 3px solid white; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
@@ -32,7 +33,7 @@
             white-space: nowrap;
             text-align: center;
             pointer-events: none;
-            transition: opacity 0.3s ease, font-size 0.3s ease; /* Transición suave al cambiar zoom */
+            transition: opacity 0.3s ease, font-size 0.3s ease;
         }
     </style>
 </head>
@@ -129,6 +130,7 @@
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-auth.js";
 
+        // TUS CREDENCIALES EXACTAS
         const firebaseConfig = {
             apiKey: "AIzaSyBqZOhs1PmGO0hfO-9g0q3k5exw8KkxpzM",
             authDomain: "turismo-los-lagos.firebaseapp.com",
@@ -152,10 +154,12 @@
         let mapMarkers = [];
         let labelMarkers = [];
 
-        // VARIABLES PARA NAVEGACIÓN ACTIVA
+        // VARIABLES PARA NAVEGACIÓN ACTIVA Y LLEGADA A DESTINO
         let currentDestination = null;
         let lastRouteCalcLocation = null;
         let isFirstRouteDraw = true;
+        let arrivalTimer = null;
+        let isAtDestination = false;
 
         const limitesLosRios = [
             [-40.80, -74.00], 
@@ -178,33 +182,41 @@
             const labels = document.querySelectorAll('.map-text-label');
             labels.forEach(label => {
                 if (currentZoom < 11) {
-                    label.style.opacity = '0'; // Se vuelven invisibles
+                    label.style.opacity = '0';
                 } else if (currentZoom === 11) {
                     label.style.opacity = '1';
-                    label.style.fontSize = '9px'; // Muy pequeños
+                    label.style.fontSize = '9px';
                 } else if (currentZoom === 12) {
                     label.style.opacity = '1';
-                    label.style.fontSize = '12px'; // Medianos
+                    label.style.fontSize = '12px';
                 } else {
                     label.style.opacity = '1';
-                    label.style.fontSize = '15px'; // Tamaño normal de lectura
+                    label.style.fontSize = '15px';
                 }
             });
         }
         map.on('zoomend', adjustLabelsByZoom);
 
-        // GPS: Seguimiento en tiempo real y Recalculación
+        // GPS: Seguimiento, Recalculación y Llegada
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition(
                 (position) => {
                     userLocation = { lat: position.coords.latitude, lng: position.coords.longitude };
-                    document.getElementById('locationStatus').innerText = "📍 Navegación activa. El mapa te está siguiendo.";
-                    document.getElementById('locationStatus').className = "bg-green-50 text-green-800 p-2 text-center text-sm font-semibold border-b border-green-100";
+                    
+                    if (!currentDestination) {
+                        document.getElementById('locationStatus').innerText = "📍 Ubicación conectada (Modo Libre).";
+                        document.getElementById('locationStatus').className = "bg-blue-50 text-blue-800 p-2 text-center text-sm font-semibold border-b border-blue-100";
+                    } else {
+                        document.getElementById('locationStatus').innerText = "📍 Navegación activa. El mapa te está siguiendo.";
+                        document.getElementById('locationStatus').className = "bg-green-50 text-green-800 p-2 text-center text-sm font-semibold border-b border-green-100";
+                    }
                     
                     if(userMarker) {
                         userMarker.setLatLng([userLocation.lat, userLocation.lng]);
-                        // LA CÁMARA SIGUE AL USUARIO AUTOMÁTICAMENTE
-                        map.panTo([userLocation.lat, userLocation.lng], { animate: true });
+                        // LA CÁMARA SOLO SIGUE AL USUARIO SI HAY UNA RUTA TRAZADA
+                        if (currentDestination) {
+                            map.panTo([userLocation.lat, userLocation.lng], { animate: true });
+                        }
                     } else {
                         const userIcon = L.divIcon({ className: 'custom-user-icon', html: '<div class="user-pulse"></div>' });
                         userMarker = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon, zIndexOffset: 1000 }).addTo(map)
@@ -213,8 +225,37 @@
                     }
                     renderPlaces(); 
 
-                    // SI HAY UNA RUTA ACTIVA, RECALCULAR SI HUBO MOVIMIENTO
+                    // SI HAY UNA RUTA ACTIVA: RECALCULAR Y REVISAR TIEMPO EN DESTINO
                     if (currentDestination) {
+                        
+                        // 1. Verificar si llegó (a menos de 50 metros)
+                        const distToDest = map.distance(
+                            [userLocation.lat, userLocation.lng],
+                            [currentDestination.lat, currentDestination.lng]
+                        );
+
+                        if (distToDest < 50) { 
+                            if (!isAtDestination) {
+                                isAtDestination = true;
+                                document.getElementById('locationStatus').innerText = "📍 Has llegado. La ruta se borrará en 5 minutos.";
+                                // Inicia el cronómetro de 5 minutos (300,000 milisegundos)
+                                arrivalTimer = setTimeout(() => {
+                                    if (routeLayer) map.removeLayer(routeLayer);
+                                    currentDestination = null;
+                                    isAtDestination = false;
+                                    lastRouteCalcLocation = null;
+                                    document.getElementById('locationStatus').innerText = "✅ Visita completada. Exploración libre reactivada.";
+                                }, 300000); 
+                            }
+                        } else {
+                            if (isAtDestination) {
+                                // Si se aleja antes de los 5 minutos, se cancela el borrado automático
+                                isAtDestination = false;
+                                clearTimeout(arrivalTimer);
+                            }
+                        }
+
+                        // 2. Recalcular la ruta si se movió
                         calculateAndDrawRoute(); 
                     }
                 },
@@ -229,9 +270,13 @@
         // Trazar Ruta (Iniciado por el usuario)
         window.traceRoute = async function(destLat, destLng) {
             if (!userLocation) return alert("Necesitamos acceso a tu GPS para calcular la ruta.");
-            currentDestination = { lat: destLat, lng: destLng }; // Guardamos el destino
+            
+            // Reiniciar estado de destino
+            currentDestination = { lat: destLat, lng: destLng }; 
             isFirstRouteDraw = true;
-            lastRouteCalcLocation = null; // Forzamos el cálculo de la nueva ruta
+            lastRouteCalcLocation = null;
+            isAtDestination = false;
+            if (arrivalTimer) clearTimeout(arrivalTimer);
             
             await calculateAndDrawRoute();
             window.scrollTo({ top: document.getElementById('map').offsetTop - 80, behavior: 'smooth' });
@@ -241,7 +286,6 @@
         async function calculateAndDrawRoute() {
             if (!userLocation || !currentDestination) return;
 
-            // Filtro: Solo recalcula si el usuario se movió más de 15 metros para no saturar el mapa
             if (lastRouteCalcLocation) {
                 const dist = map.distance(
                     [userLocation.lat, userLocation.lng], 
@@ -258,12 +302,11 @@
                 const data = await response.json();
                 
                 if(data.routes && data.routes.length > 0) {
-                    if (routeLayer) map.removeLayer(routeLayer); // Borra la línea anterior si te desviaste
+                    if (routeLayer) map.removeLayer(routeLayer); 
                     
                     const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
                     routeLayer = L.polyline(coords, { color: '#3b82f6', weight: 6, opacity: 0.9 }).addTo(map);
                     
-                    // Si es la primera vez que se dibuja, hace zoom para mostrar el trayecto completo
                     if (isFirstRouteDraw) {
                         map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
                         isFirstRouteDraw = false;
@@ -342,7 +385,6 @@
                     </li>`;
                 }
             });
-            // Aplica los tamaños correctos inmediatamente
             adjustLabelsByZoom();
         }
 
