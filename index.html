@@ -107,14 +107,14 @@
                 </div>
 
                 <div class="border-t pt-4 border-gray-200">
-                    <h2 class="text-lg font-bold mb-2 text-[#2c4c3b]">🔤 Textos en el Mapa</h2>
+                    <h2 class="text-lg font-bold mb-2 text-[#2c4c3b]">🔤 Textos en el Mapa (Personalizados)</h2>
                     <form id="labelForm" class="flex flex-col gap-2 mb-2">
-                        <input type="text" id="labelText" placeholder="Ej: Río San Pedro" class="p-2 bg-gray-50 border rounded w-full text-sm" required>
+                        <input type="text" id="labelText" placeholder="Ej: Puente San Pedro" class="p-2 bg-gray-50 border rounded w-full text-sm" required>
                         <div class="flex gap-2">
                             <input type="number" id="labelLat" step="any" placeholder="Lat" class="p-2 bg-gray-50 border rounded w-1/2 text-sm" required>
                             <input type="number" id="labelLng" step="any" placeholder="Lng" class="p-2 bg-gray-50 border rounded w-1/2 text-sm" required>
                         </div>
-                        <button type="submit" class="bg-blue-600 text-white px-3 py-2 rounded font-bold text-sm hover:bg-blue-700">Pintar Texto</button>
+                        <button type="submit" class="bg-blue-600 text-white px-3 py-2 rounded font-bold text-sm hover:bg-blue-700">Pintar Texto Extra</button>
                     </form>
                     <ul id="adminLabelList" class="space-y-1 text-sm max-h-32 overflow-y-auto pr-2"></ul>
                 </div>
@@ -130,7 +130,6 @@
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-auth.js";
 
-        // TUS CREDENCIALES EXACTAS
         const firebaseConfig = {
             apiKey: "AIzaSyBqZOhs1PmGO0hfO-9g0q3k5exw8KkxpzM",
             authDomain: "turismo-los-lagos.firebaseapp.com",
@@ -153,6 +152,22 @@
         let map, userMarker, routeLayer;
         let mapMarkers = [];
         let labelMarkers = [];
+
+        // NOMBRES Y LOCALIDADES PREDEFINIDAS DEL ENTORNO
+        const presetLabels = [
+            { texto: 'Comuna de Los Lagos', lat: -39.8511, lng: -72.8225 },
+            { texto: 'Antilhue', lat: -39.8118, lng: -72.9602 },
+            { texto: 'Malihue', lat: -39.7712, lng: -72.7145 },
+            { texto: 'Riñihue', lat: -39.8276, lng: -72.4578 },
+            { texto: 'Quinchilca', lat: -39.8711, lng: -72.7831 },
+            { texto: 'Los Robles', lat: -39.8250, lng: -72.8850 },
+            { texto: 'Los Ciruelos', lat: -39.7920, lng: -72.8630 },
+            { texto: 'Río San Pedro', lat: -39.8350, lng: -72.6500 },
+            { texto: 'Lago Riñihue', lat: -39.8000, lng: -72.3800 },
+            { texto: 'Valdivia', lat: -39.8142, lng: -73.2459 },
+            { texto: 'Paillaco', lat: -40.0618, lng: -72.8804 },
+            { texto: 'Panguipulli', lat: -39.6433, lng: -72.3325 }
+        ];
 
         // VARIABLES PARA NAVEGACIÓN ACTIVA Y LLEGADA A DESTINO
         let currentDestination = null;
@@ -213,7 +228,6 @@
                     
                     if(userMarker) {
                         userMarker.setLatLng([userLocation.lat, userLocation.lng]);
-                        // LA CÁMARA SOLO SIGUE AL USUARIO SI HAY UNA RUTA TRAZADA
                         if (currentDestination) {
                             map.panTo([userLocation.lat, userLocation.lng], { animate: true });
                         }
@@ -225,10 +239,7 @@
                     }
                     renderPlaces(); 
 
-                    // SI HAY UNA RUTA ACTIVA: RECALCULAR Y REVISAR TIEMPO EN DESTINO
                     if (currentDestination) {
-                        
-                        // 1. Verificar si llegó (a menos de 50 metros)
                         const distToDest = map.distance(
                             [userLocation.lat, userLocation.lng],
                             [currentDestination.lat, currentDestination.lng]
@@ -238,7 +249,6 @@
                             if (!isAtDestination) {
                                 isAtDestination = true;
                                 document.getElementById('locationStatus').innerText = "📍 Has llegado. La ruta se borrará en 5 minutos.";
-                                // Inicia el cronómetro de 5 minutos (300,000 milisegundos)
                                 arrivalTimer = setTimeout(() => {
                                     if (routeLayer) map.removeLayer(routeLayer);
                                     currentDestination = null;
@@ -249,13 +259,11 @@
                             }
                         } else {
                             if (isAtDestination) {
-                                // Si se aleja antes de los 5 minutos, se cancela el borrado automático
                                 isAtDestination = false;
                                 clearTimeout(arrivalTimer);
                             }
                         }
 
-                        // 2. Recalcular la ruta si se movió
                         calculateAndDrawRoute(); 
                     }
                 },
@@ -267,11 +275,10 @@
             );
         }
 
-        // Trazar Ruta (Iniciado por el usuario)
+        // Trazar Ruta
         window.traceRoute = async function(destLat, destLng) {
             if (!userLocation) return alert("Necesitamos acceso a tu GPS para calcular la ruta.");
             
-            // Reiniciar estado de destino
             currentDestination = { lat: destLat, lng: destLng }; 
             isFirstRouteDraw = true;
             lastRouteCalcLocation = null;
@@ -282,7 +289,6 @@
             window.scrollTo({ top: document.getElementById('map').offsetTop - 80, behavior: 'smooth' });
         };
 
-        // Lógica de cálculo y dibujo de ruta
         async function calculateAndDrawRoute() {
             if (!userLocation || !currentDestination) return;
 
@@ -356,7 +362,7 @@
         });
 
         window.deleteLabel = async function(id) {
-            if(confirm("¿Eliminar este texto del mapa?")) {
+            if(confirm("¿Eliminar este texto personalizado del mapa?")) {
                 await deleteDoc(doc(db, "etiquetas", id));
             }
         };
@@ -368,6 +374,19 @@
             const adminList = document.getElementById('adminLabelList');
             if(adminList) adminList.innerHTML = '';
 
+            // 1. Dibujar etiquetas PREDEFINIDAS
+            presetLabels.forEach(lbl => {
+                const textIcon = L.divIcon({
+                    className: 'map-text-label',
+                    html: lbl.texto,
+                    iconSize: [150, 20],
+                    iconAnchor: [75, 10]
+                });
+                const marker = L.marker([lbl.lat, lbl.lng], { icon: textIcon, interactive: false }).addTo(map);
+                labelMarkers.push(marker);
+            });
+
+            // 2. Dibujar etiquetas PERSONALIZADAS creadas por el Admin
             allLabels.forEach(lbl => {
                 const textIcon = L.divIcon({
                     className: 'map-text-label',
