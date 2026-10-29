@@ -6,9 +6,11 @@
     <title>Rayün Ecorefugio - Guía de Huéspedes</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="icon" type="image/png" href="https://i.ibb.co/fVjKQKD4/rayunrender.png"> <!-- Favicon -->
+    <link rel="icon" type="image/png" href="https://i.ibb.co/fVjKQKD4/rayunrender.png">
     <style>
         #map { height: 400px; width: 100%; border-radius: 0.75rem; z-index: 1; }
+        
+        /* Animación del GPS */
         .user-pulse {
             background-color: #3b82f6; width: 16px; height: 16px; border-radius: 50%;
             border: 3px solid white; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
@@ -18,6 +20,20 @@
             0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
             70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
             100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+
+        /* Estilo para los textos flotantes en el mapa */
+        .map-text-label {
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            color: #ffffff;
+            font-weight: 800;
+            font-size: 13px;
+            text-shadow: 1px 1px 3px #000, -1px -1px 3px #000, 1px -1px 3px #000, -1px 1px 3px #000;
+            white-space: nowrap;
+            text-align: center;
+            pointer-events: none; /* Permite arrastrar el mapa a través del texto */
         }
     </style>
 </head>
@@ -80,14 +96,31 @@
                 </form>
             </div>
 
-            <!-- Gestión de Categorías -->
-            <div class="border-t md:border-t-0 md:border-l border-gray-200 pt-6 md:pt-0 md:pl-6">
-                <h2 class="text-lg font-bold mb-4 text-[#2c4c3b]">🏷️ Tus Categorías</h2>
-                <form id="catForm" class="flex gap-2 mb-4">
-                    <input type="text" id="catName" placeholder="Nueva categoría" class="p-2 bg-gray-50 border rounded w-full text-sm" required>
-                    <button type="submit" class="bg-[#2c4c3b] text-white px-3 py-2 rounded font-bold text-sm">+</button>
-                </form>
-                <ul id="adminCatList" class="space-y-2 text-sm max-h-48 overflow-y-auto pr-2"></ul>
+            <!-- Gestión de Categorías y Textos -->
+            <div class="border-t md:border-t-0 md:border-l border-gray-200 pt-6 md:pt-0 md:pl-6 flex flex-col gap-6">
+                
+                <div>
+                    <h2 class="text-lg font-bold mb-2 text-[#2c4c3b]">🏷️ Categorías</h2>
+                    <form id="catForm" class="flex gap-2 mb-2">
+                        <input type="text" id="catName" placeholder="Nueva categoría" class="p-2 bg-gray-50 border rounded w-full text-sm" required>
+                        <button type="submit" class="bg-[#2c4c3b] text-white px-3 py-2 rounded font-bold text-sm">+</button>
+                    </form>
+                    <ul id="adminCatList" class="space-y-1 text-sm max-h-32 overflow-y-auto pr-2"></ul>
+                </div>
+
+                <div class="border-t pt-4 border-gray-200">
+                    <h2 class="text-lg font-bold mb-2 text-[#2c4c3b]">🔤 Textos en el Mapa</h2>
+                    <form id="labelForm" class="flex flex-col gap-2 mb-2">
+                        <input type="text" id="labelText" placeholder="Ej: Río San Pedro" class="p-2 bg-gray-50 border rounded w-full text-sm" required>
+                        <div class="flex gap-2">
+                            <input type="number" id="labelLat" step="any" placeholder="Lat" class="p-2 bg-gray-50 border rounded w-1/2 text-sm" required>
+                            <input type="number" id="labelLng" step="any" placeholder="Lng" class="p-2 bg-gray-50 border rounded w-1/2 text-sm" required>
+                        </div>
+                        <button type="submit" class="bg-blue-600 text-white px-3 py-2 rounded font-bold text-sm hover:bg-blue-700">Pintar Texto</button>
+                    </form>
+                    <ul id="adminLabelList" class="space-y-1 text-sm max-h-32 overflow-y-auto pr-2"></ul>
+                </div>
+
             </div>
         </div>
 
@@ -101,7 +134,7 @@
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-auth.js";
 
-        // CREDENCIALES
+        // TUS CREDENCIALES EXACTAS
         const firebaseConfig = {
             apiKey: "AIzaSyBqZOhs1PmGO0hfO-9g0q3k5exw8KkxpzM",
             authDomain: "turismo-los-lagos.firebaseapp.com",
@@ -122,24 +155,25 @@
         let currentFilter = 'Todas';
         let map, userMarker, routeLayer;
         let mapMarkers = [];
+        let labelMarkers = [];
 
-        // Inicializar Mapa
-        const limitesLosLagos = [
-            [-40.05, -73.10], // Límite Suroeste (hacia Valdivia/Paillaco)
-            [-39.65, -72.40]  // Límite Noreste (hacia Panguipulli/Riñihue)
+        // LÍMITES AMPLIADOS A TODA LA REGIÓN DE LOS RÍOS
+        const limitesLosRios = [
+            [-40.80, -74.00], 
+            [-39.20, -71.50]  
         ];
 
         map = L.map('map', {
-            maxBounds: limitesLosLagos,
-            maxBoundsViscosity: 1.0, // Hace que el límite sea un muro sólido sin rebote
-            minZoom: 10 // Bloquea el zoom para que no puedan alejar demasiado la cámara
-        }).setView([-39.85, -72.82], 13);
+            maxBounds: limitesLosRios,
+            maxBoundsViscosity: 1.0, 
+            minZoom: 8
+        }).setView([-39.85, -72.82], 10); 
 
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             attribution: '© Esri'
         }).addTo(map);
 
-        // Seguimiento GPS en Tiempo Real
+        // Seguimiento GPS
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition(
                 (position) => {
@@ -153,9 +187,9 @@
                         const userIcon = L.divIcon({ className: 'custom-user-icon', html: '<div class="user-pulse"></div>' });
                         userMarker = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon, zIndexOffset: 1000 }).addTo(map)
                             .bindPopup("<b>Tú estás aquí</b>").openPopup();
-                        map.setView([userLocation.lat, userLocation.lng], 14);
+                        map.setView([userLocation.lat, userLocation.lng], 12);
                     }
-                    renderPlaces(); // Actualizar distancias si te mueves
+                    renderPlaces(); 
                 },
                 (err) => {
                     document.getElementById('locationStatus').innerText = "⚠️ Activa el GPS para trazar rutas desde tu ubicación.";
@@ -165,14 +199,11 @@
             );
         }
 
-        // Trazar Ruta (OSRM API)
-        window.traceRoute = async function(destLat, destLng, placeName) {
+        // Trazar Ruta
+        window.traceRoute = async function(destLat, destLng) {
             if (!userLocation) return alert("Necesitamos acceso a tu GPS para calcular la ruta.");
-            
             if (routeLayer) map.removeLayer(routeLayer);
-            
             try {
-                // Se agregó &overview=full para trazar la ruta exacta por las calles
                 const url = `https://router.project-osrm.org/route/v1/driving/${userLocation.lng},${userLocation.lat};${destLng},${destLat}?geometries=geojson&overview=full`;
                 const response = await fetch(url);
                 const data = await response.json();
@@ -183,7 +214,7 @@
                     map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
                 }
             } catch (e) {
-                alert("No se pudo calcular la ruta en este momento.");
+                alert("No se pudo calcular la ruta.");
             }
             window.scrollTo({ top: document.getElementById('map').offsetTop - 80, behavior: 'smooth' });
         };
@@ -203,15 +234,68 @@
             document.getElementById('adminPanel').style.display = user ? 'grid' : 'none';
             renderPlaces();
             renderCategories();
+            renderLabels(); // Recargar textos al loguearse
         });
 
-        // ---------------- CATEGORÍAS (CRUD) ----------------
+        // ---------------- TEXTOS EN EL MAPA (ETIQUETAS) ----------------
+        let allLabels = [];
+        
+        onSnapshot(collection(db, "etiquetas"), (snapshot) => {
+            allLabels = [];
+            snapshot.forEach(doc => allLabels.push({ id: doc.id, ...doc.data() }));
+            renderLabels();
+        });
+
+        document.getElementById('labelForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if(!isAdmin) return;
+            await addDoc(collection(db, "etiquetas"), { 
+                texto: document.getElementById('labelText').value,
+                lat: parseFloat(document.getElementById('labelLat').value),
+                lng: parseFloat(document.getElementById('labelLng').value)
+            });
+            e.target.reset();
+        });
+
+        window.deleteLabel = async function(id) {
+            if(confirm("¿Eliminar este texto del mapa?")) {
+                await deleteDoc(doc(db, "etiquetas", id));
+            }
+        };
+
+        function renderLabels() {
+            labelMarkers.forEach(m => map.removeLayer(m));
+            labelMarkers = [];
+
+            const adminList = document.getElementById('adminLabelList');
+            if(adminList) adminList.innerHTML = '';
+
+            allLabels.forEach(lbl => {
+                const textIcon = L.divIcon({
+                    className: 'map-text-label',
+                    html: lbl.texto,
+                    iconSize: [150, 20],
+                    iconAnchor: [75, 10]
+                });
+                
+                const marker = L.marker([lbl.lat, lbl.lng], { icon: textIcon, interactive: false }).addTo(map);
+                labelMarkers.push(marker);
+
+                if(isAdmin && adminList) {
+                    adminList.innerHTML += `<li class="flex justify-between items-center bg-gray-50 p-2 rounded border">
+                        ${lbl.texto} <button onclick="deleteLabel('${lbl.id}')" class="text-red-600 font-bold hover:text-red-800">X</button>
+                    </li>`;
+                }
+            });
+        }
+
+        // ---------------- CATEGORÍAS ----------------
         onSnapshot(collection(db, "categorias"), (snapshot) => {
             allCategories = [];
             snapshot.forEach(doc => allCategories.push({ id: doc.id, nombre: doc.data().nombre }));
             allCategories.sort((a,b) => a.nombre.localeCompare(b.nombre));
             renderCategories();
-            renderPlaces(); // Recargar filtros
+            renderPlaces(); 
         });
 
         document.getElementById('catForm').addEventListener('submit', async (e) => {
@@ -223,34 +307,22 @@
         });
 
         window.deleteCategory = async function(id) {
-            if(confirm("¿Eliminar categoría? Los lugares que la usen quedarán sin categoría.")) {
-                await deleteDoc(doc(db, "categorias", id));
-            }
+            if(confirm("¿Eliminar categoría?")) await deleteDoc(doc(db, "categorias", id));
         };
 
         function renderCategories() {
-            // Select de formulario
             const select = document.getElementById('placeCategory');
             select.innerHTML = '<option value="">Selecciona una categoría...</option>';
-            
-            // Botones de filtro público
             const filterContainer = document.getElementById('filterContainer');
             filterContainer.innerHTML = `<span class="text-sm font-bold text-gray-500 mr-2">Explorar:</span>
                 <button onclick="filterCategory('Todas')" class="${currentFilter === 'Todas' ? 'bg-[#2c4c3b] text-white' : 'bg-gray-200 text-gray-700'} px-3 py-1 rounded-full text-sm font-semibold transition">Todas</button>`;
-
-            // Lista Admin
             const adminList = document.getElementById('adminCatList');
             adminList.innerHTML = '';
 
             allCategories.forEach(c => {
-                // Agregar a Select
                 select.innerHTML += `<option value="${c.nombre}">${c.nombre}</option>`;
-                
-                // Agregar a Filtros
                 const isSelected = currentFilter === c.nombre ? 'bg-[#2c4c3b] text-white' : 'bg-gray-200 text-gray-700 hover:bg-[#e8ecd7]';
                 filterContainer.innerHTML += `<button onclick="filterCategory('${c.nombre}')" class="${isSelected} px-3 py-1 rounded-full text-sm font-semibold transition">${c.nombre}</button>`;
-
-                // Agregar a Lista Admin
                 if(isAdmin) {
                     adminList.innerHTML += `<li class="flex justify-between items-center bg-gray-50 p-2 rounded border">
                         ${c.nombre} <button onclick="deleteCategory('${c.id}')" class="text-red-600 font-bold hover:text-red-800">X</button>
@@ -261,15 +333,14 @@
 
         window.filterCategory = function(cat) {
             currentFilter = cat;
-            renderCategories(); // Actualizar colores de botones
+            renderCategories(); 
             renderPlaces();
         };
 
-        // ---------------- LUGARES (CRUD) ----------------
+        // ---------------- LUGARES ----------------
         document.getElementById('placeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             if(!isAdmin) return;
-
             const editId = document.getElementById('editPlaceId').value;
             const data = {
                 nombre: document.getElementById('placeName').value,
@@ -363,10 +434,7 @@
             if (!p) return;
             document.getElementById('editPlaceId').value = p.id;
             document.getElementById('placeName').value = p.nombre;
-            
-            // Esperar un poco a que el select tenga las opciones cargadas si no lo estaba
             setTimeout(() => { document.getElementById('placeCategory').value = p.categoria; }, 50);
-            
             document.getElementById('placeDesc').value = p.descripcion;
             document.getElementById('placeImage').value = p.imagen;
             document.getElementById('placeLat').value = p.lat;
@@ -378,9 +446,7 @@
         };
 
         window.deletePlace = async function(id) {
-            if (confirm("¿Eliminar este destino de la guía?")) {
-                await deleteDoc(doc(db, "lugares", id));
-            }
+            if (confirm("¿Eliminar este destino?")) await deleteDoc(doc(db, "lugares", id));
         };
     </script>
 </body>
